@@ -1,26 +1,25 @@
-class SpaceShooterGame {
+class FlappyBirdGame {
     constructor() {
         this.canvas = null;
         this.ctx = null;
-        this.player = {
-            x: 0,
+        this.bird = {
+            x: 100,
             y: 0,
-            width: 30,
-            height: 40,
-            speed: 5,
-            color: '#00ff00'
+            width: 34,
+            height: 24,
+            velocity: 0,
+            gravity: 0.5,
+            jumpStrength: -9,
+            rotation: 0
         };
-        this.enemies = [];
-        this.bullets = [];
-        this.particles = [];
+        this.pipes = [];
         this.score = 0;
-        this.lives = 3;
         this.gameState = 'start'; // 'start', 'playing', 'gameOver'
-        this.keys = {};
-        this.lastEnemySpawn = 0;
-        this.enemySpawnRate = 2000; // milliseconds
-        this.lastTime = 0;
-        this.stars = [];
+        this.pipeGap = 150;
+        this.pipeWidth = 60;
+        this.pipeSpeed = 2;
+        this.frameCount = 0;
+        this.pipeFrequency = 90; // frames between pipes
         
         this.init();
         this.setupEventListeners();
@@ -35,77 +34,45 @@ class SpaceShooterGame {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
         
-        // Initialize player position
-        this.player.x = this.canvas.width / 2 - this.player.width / 2;
-        this.player.y = this.canvas.height - this.player.height - 50;
+        // Initialize bird position
+        this.bird.y = this.canvas.height / 2;
+    }
+    
+    createPipe() {
+        const minHeight = 50;
+        const maxHeight = this.canvas.height - this.pipeGap - minHeight - 100;
+        const topHeight = Math.random() * (maxHeight - minHeight) + minHeight;
         
-        this.createStars();
-    }
-    
-    createStars() {
-        // Create background stars
-        for (let i = 0; i < 100; i++) {
-            this.stars.push({
-                x: Math.random() * this.canvas.width,
-                y: Math.random() * this.canvas.height,
-                radius: Math.random() * 2,
-                speed: Math.random() * 2 + 1,
-                brightness: Math.random()
-            });
-        }
-    }
-    
-    createEnemy() {
-        const enemy = {
-            x: Math.random() * (this.canvas.width - 40),
-            y: -40,
-            width: 40,
-            height: 30,
-            speed: 2 + Math.random() * 3,
-            color: '#ff0000'
+        const pipe = {
+            x: this.canvas.width,
+            topHeight: topHeight,
+            bottomY: topHeight + this.pipeGap,
+            width: this.pipeWidth,
+            passed: false
         };
-        this.enemies.push(enemy);
-    }
-    
-    createBullet() {
-        const bullet = {
-            x: this.player.x + this.player.width / 2 - 2,
-            y: this.player.y,
-            width: 4,
-            height: 10,
-            speed: 8,
-            color: '#ffff00'
-        };
-        this.bullets.push(bullet);
-    }
-    
-    createParticle(x, y, color = '#ffffff') {
-        for (let i = 0; i < 8; i++) {
-            this.particles.push({
-                x: x,
-                y: y,
-                vx: (Math.random() - 0.5) * 10,
-                vy: (Math.random() - 0.5) * 10,
-                life: 1,
-                decay: 0.02,
-                color: color
-            });
-        }
+        this.pipes.push(pipe);
     }
     
     setupEventListeners() {
         // Keyboard events
+        const jump = () => {
+            if (this.gameState === 'playing') {
+                this.bird.velocity = this.bird.jumpStrength;
+            }
+        };
+        
         document.addEventListener('keydown', (event) => {
-            this.keys[event.code] = true;
-            
-            if (event.code === 'Space' && this.gameState === 'playing') {
-                this.createBullet();
+            if (event.code === 'Space') {
+                jump();
                 event.preventDefault();
             }
         });
         
-        document.addEventListener('keyup', (event) => {
-            this.keys[event.code] = false;
+        // Mouse/touch events for jumping
+        this.canvas.addEventListener('click', jump);
+        this.canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            jump();
         });
         
         // UI buttons
@@ -121,33 +88,28 @@ class SpaceShooterGame {
         window.addEventListener('resize', () => {
             this.canvas.width = window.innerWidth;
             this.canvas.height = window.innerHeight;
-            this.player.x = this.canvas.width / 2 - this.player.width / 2;
-            this.player.y = this.canvas.height - this.player.height - 50;
         });
     }
     
     startGame() {
         this.gameState = 'playing';
         document.getElementById('startScreen').classList.add('hidden');
-        this.lastTime = performance.now();
         this.animate();
     }
     
     restartGame() {
         // Reset game state
         this.score = 0;
-        this.lives = 3;
         this.gameState = 'playing';
-        this.enemySpawnRate = 2000;
+        this.frameCount = 0;
         
-        // Clear arrays
-        this.enemies = [];
-        this.bullets = [];
-        this.particles = [];
+        // Clear pipes
+        this.pipes = [];
         
-        // Reset player position
-        this.player.x = this.canvas.width / 2 - this.player.width / 2;
-        this.player.y = this.canvas.height - this.player.height - 50;
+        // Reset bird
+        this.bird.y = this.canvas.height / 2;
+        this.bird.velocity = 0;
+        this.bird.rotation = 0;
         
         // Update UI
         this.updateUI();
@@ -155,135 +117,81 @@ class SpaceShooterGame {
         // Hide game over screen
         document.getElementById('gameOverScreen').classList.add('hidden');
         
-        this.lastTime = performance.now();
         this.animate();
     }
     
-    updatePlayer(deltaTime) {
+    updateBird() {
         if (this.gameState !== 'playing') return;
         
-        const speed = this.player.speed * (deltaTime / 16); // Normalize to ~60fps
+        // Apply gravity
+        this.bird.velocity += this.bird.gravity;
+        this.bird.y += this.bird.velocity;
         
-        // Move left/right
-        if (this.keys['ArrowLeft'] && this.player.x > 0) {
-            this.player.x -= speed;
-        }
-        if (this.keys['ArrowRight'] && this.player.x < this.canvas.width - this.player.width) {
-            this.player.x += speed;
+        // Update rotation based on velocity
+        this.bird.rotation = Math.min(Math.max(this.bird.velocity * 3, -30), 90);
+        
+        // Check ground collision
+        if (this.bird.y + this.bird.height >= this.canvas.height - 50) {
+            this.bird.y = this.canvas.height - 50 - this.bird.height;
+            this.gameOver();
         }
         
-        // Move up/down (limited range)
-        if (this.keys['ArrowUp'] && this.player.y > this.canvas.height * 0.5) {
-            this.player.y -= speed;
-        }
-        if (this.keys['ArrowDown'] && this.player.y < this.canvas.height - this.player.height - 20) {
-            this.player.y += speed;
+        // Check ceiling collision
+        if (this.bird.y <= 0) {
+            this.bird.y = 0;
+            this.bird.velocity = 0;
         }
     }
     
-    updateEnemies(deltaTime) {
+    updatePipes() {
         if (this.gameState !== 'playing') return;
         
-        // Spawn enemies
-        const now = performance.now();
-        if (now - this.lastEnemySpawn > this.enemySpawnRate) {
-            this.createEnemy();
-            this.lastEnemySpawn = now;
-            
-            // Increase difficulty over time
-            if (this.enemySpawnRate > 800) {
-                this.enemySpawnRate -= 20;
-            }
+        // Create new pipes
+        this.frameCount++;
+        if (this.frameCount % this.pipeFrequency === 0) {
+            this.createPipe();
         }
         
-        // Update enemy positions
-        for (let i = this.enemies.length - 1; i >= 0; i--) {
-            const enemy = this.enemies[i];
-            enemy.y += enemy.speed * (deltaTime / 16);
+        // Update pipe positions
+        for (let i = this.pipes.length - 1; i >= 0; i--) {
+            const pipe = this.pipes[i];
+            pipe.x -= this.pipeSpeed;
             
-            // Remove enemies that are off screen
-            if (enemy.y > this.canvas.height) {
-                this.enemies.splice(i, 1);
-            }
-            // Check collision with player
-            else if (this.checkCollision(enemy, this.player)) {
-                this.createParticle(enemy.x + enemy.width/2, enemy.y + enemy.height/2, '#ff0000');
-                this.enemies.splice(i, 1);
-                this.lives--;
-                
-                if (this.lives <= 0) {
-                    this.gameOver();
-                }
-            }
-        }
-    }
-    
-    updateBullets(deltaTime) {
-        if (this.gameState !== 'playing') return;
-        
-        // Update bullet positions
-        for (let i = this.bullets.length - 1; i >= 0; i--) {
-            const bullet = this.bullets[i];
-            bullet.y -= bullet.speed * (deltaTime / 16);
-            
-            // Remove bullets that are off screen
-            if (bullet.y < -bullet.height) {
-                this.bullets.splice(i, 1);
+            // Remove off-screen pipes
+            if (pipe.x + pipe.width < 0) {
+                this.pipes.splice(i, 1);
                 continue;
             }
             
-            // Check collision with enemies
-            for (let j = this.enemies.length - 1; j >= 0; j--) {
-                const enemy = this.enemies[j];
-                if (this.checkCollision(bullet, enemy)) {
-                    // Create explosion particles
-                    this.createParticle(enemy.x + enemy.width/2, enemy.y + enemy.height/2, '#ffff00');
-                    
-                    // Remove bullet and enemy
-                    this.bullets.splice(i, 1);
-                    this.enemies.splice(j, 1);
-                    
-                    // Increase score
-                    this.score += 10;
-                    break;
-                }
+            // Check if bird passed the pipe
+            if (!pipe.passed && pipe.x + pipe.width < this.bird.x) {
+                pipe.passed = true;
+                this.score++;
             }
-        }
-    }
-    
-    updateParticles(deltaTime) {
-        for (let i = this.particles.length - 1; i >= 0; i--) {
-            const particle = this.particles[i];
-            particle.x += particle.vx * (deltaTime / 16);
-            particle.y += particle.vy * (deltaTime / 16);
-            particle.life -= particle.decay;
             
-            if (particle.life <= 0) {
-                this.particles.splice(i, 1);
+            // Check collision with pipes
+            if (this.checkPipeCollision(pipe)) {
+                this.gameOver();
             }
         }
     }
     
-    updateStars(deltaTime) {
-        this.stars.forEach(star => {
-            star.y += star.speed * (deltaTime / 16);
-            if (star.y > this.canvas.height) {
-                star.y = -5;
-                star.x = Math.random() * this.canvas.width;
+    checkPipeCollision(pipe) {
+        // Check if bird is horizontally aligned with pipe
+        if (this.bird.x + this.bird.width > pipe.x && 
+            this.bird.x < pipe.x + pipe.width) {
+            
+            // Check if bird hits top or bottom pipe
+            if (this.bird.y < pipe.topHeight || 
+                this.bird.y + this.bird.height > pipe.bottomY) {
+                return true;
             }
-        });
-    }
-    
-    checkCollision(obj1, obj2) {
-        return obj1.x < obj2.x + obj2.width &&
-               obj1.x + obj1.width > obj2.x &&
-               obj1.y < obj2.y + obj2.height &&
-               obj1.y + obj1.height > obj2.y;
+        }
+        return false;
     }
     
     updateUI() {
         document.getElementById('score').textContent = `Score: ${this.score}`;
-        document.getElementById('lives').textContent = `Lives: ${this.lives}`;
     }
     
     gameOver() {
@@ -292,83 +200,158 @@ class SpaceShooterGame {
         document.getElementById('gameOverScreen').classList.remove('hidden');
     }
     
-    draw() {
-        // Clear canvas
-        this.ctx.fillStyle = '#000011';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    drawBird() {
+        this.ctx.save();
         
-        // Draw stars
-        this.stars.forEach(star => {
-            this.ctx.globalAlpha = star.brightness;
-            this.ctx.fillStyle = '#ffffff';
-            this.ctx.beginPath();
-            this.ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
-            this.ctx.fill();
-        });
-        this.ctx.globalAlpha = 1;
+        // Move to bird position
+        this.ctx.translate(this.bird.x + this.bird.width / 2, this.bird.y + this.bird.height / 2);
         
-        // Draw player (spaceship shape)
-        this.ctx.fillStyle = this.player.color;
+        // Rotate bird
+        this.ctx.rotate(this.bird.rotation * Math.PI / 180);
+        
+        // Draw bird body (yellow circle)
+        this.ctx.fillStyle = '#FFD700';
         this.ctx.beginPath();
-        this.ctx.moveTo(this.player.x + this.player.width / 2, this.player.y);
-        this.ctx.lineTo(this.player.x, this.player.y + this.player.height);
-        this.ctx.lineTo(this.player.x + this.player.width, this.player.y + this.player.height);
+        this.ctx.arc(0, 0, this.bird.width / 2, 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        // Draw bird outline
+        this.ctx.strokeStyle = '#FFA500';
+        this.ctx.lineWidth = 2;
+        this.ctx.stroke();
+        
+        // Draw wing
+        this.ctx.fillStyle = '#FFA500';
+        this.ctx.beginPath();
+        this.ctx.ellipse(-5, 5, 8, 12, 0, 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        // Draw eye
+        this.ctx.fillStyle = '#000000';
+        this.ctx.beginPath();
+        this.ctx.arc(8, -5, 3, 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        // Draw beak
+        this.ctx.fillStyle = '#FF6347';
+        this.ctx.beginPath();
+        this.ctx.moveTo(12, 0);
+        this.ctx.lineTo(18, -3);
+        this.ctx.lineTo(18, 3);
         this.ctx.closePath();
         this.ctx.fill();
         
-        // Draw enemies
-        this.enemies.forEach(enemy => {
-            this.ctx.fillStyle = enemy.color;
-            this.ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
-            
-            // Add simple detail
-            this.ctx.fillStyle = '#990000';
-            this.ctx.fillRect(enemy.x + 5, enemy.y + 5, enemy.width - 10, enemy.height - 10);
-        });
-        
-        // Draw bullets
-        this.bullets.forEach(bullet => {
-            this.ctx.fillStyle = bullet.color;
-            this.ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
-            
-            // Add glow effect
-            this.ctx.shadowColor = bullet.color;
-            this.ctx.shadowBlur = 10;
-            this.ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
-            this.ctx.shadowBlur = 0;
-        });
-        
-        // Draw particles
-        this.particles.forEach(particle => {
-            this.ctx.globalAlpha = particle.life;
-            this.ctx.fillStyle = particle.color;
-            this.ctx.beginPath();
-            this.ctx.arc(particle.x, particle.y, 3, 0, Math.PI * 2);
-            this.ctx.fill();
-        });
-        this.ctx.globalAlpha = 1;
+        this.ctx.restore();
     }
     
-    animate(currentTime = 0) {
+    drawPipes() {
+        this.pipes.forEach(pipe => {
+            // Draw top pipe
+            this.ctx.fillStyle = '#228B22';
+            this.ctx.fillRect(pipe.x, 0, pipe.width, pipe.topHeight);
+            
+            // Draw top pipe cap
+            this.ctx.fillStyle = '#32CD32';
+            this.ctx.fillRect(pipe.x - 5, pipe.topHeight - 30, pipe.width + 10, 30);
+            
+            // Draw bottom pipe
+            this.ctx.fillStyle = '#228B22';
+            this.ctx.fillRect(pipe.x, pipe.bottomY, pipe.width, this.canvas.height - pipe.bottomY);
+            
+            // Draw bottom pipe cap
+            this.ctx.fillStyle = '#32CD32';
+            this.ctx.fillRect(pipe.x - 5, pipe.bottomY, pipe.width + 10, 30);
+            
+            // Add pipe texture
+            this.ctx.strokeStyle = '#1a6d1a';
+            this.ctx.lineWidth = 2;
+            for (let y = 20; y < pipe.topHeight; y += 20) {
+                this.ctx.beginPath();
+                this.ctx.moveTo(pipe.x, y);
+                this.ctx.lineTo(pipe.x + pipe.width, y);
+                this.ctx.stroke();
+            }
+            for (let y = pipe.bottomY + 30; y < this.canvas.height; y += 20) {
+                this.ctx.beginPath();
+                this.ctx.moveTo(pipe.x, y);
+                this.ctx.lineTo(pipe.x + pipe.width, y);
+                this.ctx.stroke();
+            }
+        });
+    }
+    
+    drawBackground() {
+        // Sky gradient
+        const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        gradient.addColorStop(0, '#4ec0ca');
+        gradient.addColorStop(0.7, '#87ceeb');
+        gradient.addColorStop(1, '#d4f1f4');
+        this.ctx.fillStyle = gradient;
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // Draw clouds
+        this.drawClouds();
+        
+        // Draw ground
+        this.ctx.fillStyle = '#DEB887';
+        this.ctx.fillRect(0, this.canvas.height - 50, this.canvas.width, 50);
+        
+        // Draw grass on ground
+        this.ctx.fillStyle = '#90EE90';
+        this.ctx.fillRect(0, this.canvas.height - 50, this.canvas.width, 10);
+    }
+    
+    drawClouds() {
+        // Simple cloud drawing
+        const time = Date.now() * 0.0001;
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        
+        // Cloud 1
+        const cloud1X = (time * 20) % (this.canvas.width + 200) - 100;
+        this.drawCloud(cloud1X, 80);
+        
+        // Cloud 2
+        const cloud2X = (time * 15) % (this.canvas.width + 200) - 100;
+        this.drawCloud(cloud2X, 150);
+        
+        // Cloud 3
+        const cloud3X = (time * 10) % (this.canvas.width + 200) - 100;
+        this.drawCloud(cloud3X, 220);
+    }
+    
+    drawCloud(x, y) {
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, 20, 0, Math.PI * 2);
+        this.ctx.arc(x + 25, y, 30, 0, Math.PI * 2);
+        this.ctx.arc(x + 50, y, 20, 0, Math.PI * 2);
+        this.ctx.fill();
+    }
+    
+    draw() {
+        // Draw background
+        this.drawBackground();
+        
+        // Draw pipes
+        this.drawPipes();
+        
+        // Draw bird
+        this.drawBird();
+    }
+    
+    animate() {
         if (this.gameState !== 'playing') return;
         
-        const deltaTime = currentTime - this.lastTime;
-        this.lastTime = currentTime;
-        
-        this.updatePlayer(deltaTime);
-        this.updateEnemies(deltaTime);
-        this.updateBullets(deltaTime);
-        this.updateParticles(deltaTime);
-        this.updateStars(deltaTime);
+        this.updateBird();
+        this.updatePipes();
         this.updateUI();
         
         this.draw();
         
-        requestAnimationFrame((time) => this.animate(time));
+        requestAnimationFrame(() => this.animate());
     }
 }
 
 // Initialize game when page loads
 window.addEventListener('load', () => {
-    new SpaceShooterGame();
+    new FlappyBirdGame();
 });
