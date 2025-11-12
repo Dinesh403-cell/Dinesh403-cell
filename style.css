@@ -5,7 +5,7 @@
 }
 
 body {
-    background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 50%, #16213e 100%);
+    background: linear-gradient(180deg, #4ec0ca 0%, #87ceeb 100%);
     font-family: 'Arial', sans-serif;
     overflow: hidden;
     height: 100vh;
@@ -19,7 +19,7 @@ body {
 
 #gameCanvas {
     display: block;
-    background: radial-gradient(ellipse at center, #0f0f23 0%, #000000 100%);
+    background: linear-gradient(180deg, #4ec0ca 0%, #87ceeb 50%, #d4f1f4 100%);
 }
 
 #ui {
@@ -60,7 +60,7 @@ body {
 .screen h1 {
     font-size: 3rem;
     margin-bottom: 1rem;
-    background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1);
+    background: linear-gradient(45deg, #f39c12, #e74c3c, #f1c40f);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -82,18 +82,18 @@ body {
 button {
     padding: 12px 24px;
     font-size: 18px;
-    background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(45deg, #f39c12 0%, #e74c3c 100%);
     color: white;
     border: none;
     border-radius: 25px;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 4px 15px rgba(243, 156, 18, 0.4);
 }
 
 button:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+    box-shadow: 0 6px 20px rgba(243, 156, 18, 0.6);
 }
 
 button:active {
@@ -102,10 +102,10 @@ button:active {
 
 @keyframes glow {
     from {
-        text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #ff6b6b, 0 0 40px #ff6b6b;
+        text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #f39c12, 0 0 40px #f39c12;
     }
     to {
-        text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #4ecdc4, 0 0 20px #4ecdc4;
+        text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #e74c3c, 0 0 20px #e74c3c;
     }
 }
 
