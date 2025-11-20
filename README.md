@@ -62,7 +62,7 @@ Here are some ideas to get you started:
 
 - 📧 Email: dineshkumar08102004@gmail.com  
 - 💼 [LinkedIn](https://www.linkedin.com/in/dinesh-kumar-b-116801296/)  
-- 🌐 Portfolio: [yourportfolio.com](https://yourportfolio.com)
+- 🌐 Portfolio: https://dk008.netlify.app
 
 ---
 
